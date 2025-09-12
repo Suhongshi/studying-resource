@@ -840,9 +840,9 @@ def dataset(path, image=False):  # 根据路径将图像信息数据化成tensor
             y.append(int(item.name[3:5]))
         else:
             y.append(int(item.name[3]))
-        image = Image.open(path + "/" + item.name)
+        image_c = Image.open(path + "/" + item.name)
         transform = transforms.ToTensor()
-        image_data = transform(image)
+        image_data = transform(image_c)
         feature.append(image_data)
     lengh = len(y)
     feature = torch.stack(feature)
@@ -851,6 +851,9 @@ def dataset(path, image=False):  # 根据路径将图像信息数据化成tensor
         return feature, y.view(lengh, -1), lengh
     else:
         return feature.view(lengh, -1), y.view(lengh, -1), lengh
+
+
+print(dataset(path, False)[:10])
 
 
 # image=Image.open(path+"/"+"obj1__0.png")
@@ -875,9 +878,9 @@ def dataloader(batch_size, path, image=False):
 
 
 FUCTION_BUTTOM = False
-w = torch.randn(128 * 128, 20, requires_grad=True, dtype=torch.float)
-b = torch.randn(20, requires_grad=True, dtype=torch.float)
 if FUCTION_BUTTOM == True:
+    w = torch.randn(128 * 128, 20, requires_grad=True, dtype=torch.float)
+    b = torch.randn(20, requires_grad=True, dtype=torch.float)
     for i in range(20):
         for x, y in dataloader(50, path):
             y_pre = torch.mm(x, w) + b
@@ -1047,21 +1050,97 @@ z2.backward()
 import torch.utils.data as Data
 import torch.nn
 
-dataset = Data.TensorDataset(x, y[:, 0])
-data = Data.DataLoader(dataset, batch_size=1, shuffle=True)
-model=nn.Sequential(
-    nn.Linear(x.size(1), 1)
-)
-model.add_module("test",nn.Linear(1,1))
-model.parameters()
-for params in model.parameters():#所有的单个参数元素堆叠，无法区分weight与bias
-
-    print(params)
+# dataset = Data.TensorDataset(x, y[:, 0])
+# data = Data.DataLoader(dataset, batch_size=1, shuffle=True)
+# model = nn.Sequential(
+#     nn.Linear(x.size(1), 1)
+# )
+# model.add_module("test", nn.Linear(1, 1))
+# model.parameters()
+# for params in model.parameters():  # 所有的单个参数元素堆叠，无法区分weight与bias
+#
+#     print(params)
 from torch.nn import init
-init.normal_(model[0].weight,0,0.01)
-init.constant_(model[0].bias,8)
 
-# print(x.view(3,-1), z1)
+
+# init.normal_(model[0].weight, 0, 0.01)
+# init.constant_(model[0].bias, 8)
+# print(x, x.gather(0, torch.tensor([[1, 1], [0, 0]])))
+# # print(x.view(3,-1), z1)
+#
+# torch.tensor(np.random.normal(0, 0.01, (3, 3)), dtype=torch.float)
+
+
+class Model1(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer1 = nn.Linear(4, 6)
+        self.layer2 = nn.ReLU()
+        self.layer3 = nn.Sequential(
+            nn.Linear(6, 10),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        y = self.layer1(x)
+        y = self.layer2(y)
+        y = self.layer3(y)
+        return y
+
+
+from torch.nn import init
+import torch.optim as optim
+
+# for x, y in dataloader(20, path):
+#     print(x, y)
+#     break
+# init.normal_(net[1].weight, 0, 0.01)
+# init.constant_(net[1].bias, 8)
+loss = nn.CrossEntropyLoss()
+
+
+# loss(y,net(x))
+
+class drop(nn.Module):
+    def __init__(self, prob):
+        super().__init__()
+        self.prob = prob
+
+    def forward(self, x):
+        matprob = torch.rand(x.size())
+        matprob = (matprob > self.prob).float()
+
+        return x * matprob / (1 - self.prob)
+
+
+temp = nn.Sequential(nn.Linear(128 * 128, 40),
+                     drop(0.05),
+                     nn.ReLU(),
+
+                     nn.Linear(40, 20))
+optimizer = optim.SGD(temp.parameters(), lr=0.01)
+epochs = 4
+for i in range(1, epochs + 1):
+    for x, y in dataloader(50, path):
+        # print(x,y)
+        output = temp(x)
+        # print(output, y.view(-1, 1))
+        l = loss(output, y.view(-1, 1).squeeze())
+
+        optimizer.zero_grad()
+        l.backward()
+        optimizer.step()
+        print(l.item())
+
+
+
+# a=True
+# b=1
+# if a==True:
+#     b=12
+# print(b)
+# x=torch.tensor([[[1,3,5],[12,43,12],[42,12,54]],[[0,1,2],[321,23,45],[21,43,45]]])
+# print(x.view(2,-1))
 # torch.cuda.is_available()
 # torch.ones_like(x,dtype=torch.float,device="cpu", requires_grad=True)
 # x.to("cuda")
